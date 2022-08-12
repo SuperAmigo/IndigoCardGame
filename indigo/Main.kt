@@ -1,70 +1,107 @@
 package indigo
 
-enum class ActionPlayer {
-    RESET,
-    SHUFFLE,
-    GET,
-    EXIT;
-}
-
 class Indigo {
     private val cardSuits = listOf("♣", "♦", "♥", "♠")
     private val cardRanks = listOf("K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2", "A")
-    private var cards = mutableListOf<String>()
+    private var cardDeck = mutableListOf<String>()
+    private var cardsOnTable = mutableListOf<String>()
+    private var cardsPlayer = mutableListOf<String>()
+    private var cardsComputer = mutableListOf<String>()
+    private var isPlayerTurn = false
 
     init {
-        resetCards()
+        println("Indigo Card Game")
+        askForPlayFirst()
+        initialCard()
         play()
+    }
+
+    private fun initialCard() {
+        resetCards()
+        cardDeck.shuffle()
+        print("Initial cards on the table: ")
+        cardsOnTable = getCards(4)
+        println(cardsOnTable.joinToString(" "))
+
+    }
+
+    private fun askForPlayFirst() {
+        val correctAnswer = arrayOf("yes", "no")
+        var answer: String
+        do {
+            println("Play first?")
+            answer = readln()
+        } while (answer !in correctAnswer)
+        isPlayerTurn = answer == "yes"
     }
 
     private fun play() {
         var playerActionInput = ""
-        while (playerActionInput != ActionPlayer.EXIT.name) {
-            println("Choose an action (reset, shuffle, get, exit):")
-            playerActionInput = readln().trim().uppercase()
-            when (playerActionInput) {
-                ActionPlayer.RESET.name -> {
-                    resetCards()
-                    println("Card deck is reset.")
-                }
-                ActionPlayer.SHUFFLE.name -> {
-                    cards.shuffle()
-                    println("Card deck is shuffled.")
-                }
-                ActionPlayer.GET.name -> getCards()
-                ActionPlayer.EXIT.name -> println("Bye")
-                else -> println("Wrong action.")
+        while (playerActionInput != "exit" && cardsOnTable.size < 52) {
+            if (cardsComputer.size != 0 || cardsPlayer.size != 0) {
+                cardOnTableAndTop()
+                if (isPlayerTurn) playerActionInput = playerTurn() else computerTurn()
+            } else {
+                cardsComputer = getCards(6)
+                cardsPlayer = getCards(6)
             }
         }
+        if (cardsOnTable.size == 52) cardOnTableAndTop()
+        println("Game Over")
+    }
+
+    private fun computerTurn() {
+        println("Computer plays ${cardsComputer[0]}")
+        cardsOnTable.add(cardsComputer[0])
+        cardsComputer.removeAt(0)
+        isPlayerTurn = true
+    }
+
+    private fun playerTurn(): String {
+        print("Cards in hand:")
+        for (i in 0 until cardsPlayer.size) {
+            print(" ${i+1})${cardsPlayer[i]}")
+        }
+        println()
+        var input: String
+        do {
+            println("Choose a card to play (1-${cardsPlayer.size}):")
+            input = readln()
+            if (input.lowercase() == "exit") return "exit"
+            val isCorrect = input.matches(Regex("\\d+")) && input.toInt() in 1..cardsPlayer.size
+        } while (!isCorrect)
+        cardsOnTable.add(cardsPlayer[input.toInt() - 1])
+        cardsPlayer.removeAt(input.toInt() - 1)
+        isPlayerTurn = false
+        return input
+    }
+
+    private fun cardOnTableAndTop() {
+        println("\n${cardsOnTable.size} cards on the table, and the top card is ${cardsOnTable[cardsOnTable.lastIndex]}")
     }
 
     private fun resetCards() {
         var index = 0
-        cards.clear()
+        cardDeck.clear()
         for (suit in cardSuits) {
             for (rank in cardRanks) {
-                cards.add(index, "$rank$suit")
+                cardDeck.add(index, "$rank$suit")
                 index++
             }
         }
     }
 
-    private fun getCards() {
-        println("Number of cards:")
-        val input = readln()
-        if (!input.matches(Regex("\\d+")) || input.toInt() !in 1..52) {
-            println("Invalid number of cards.")
-        } else {
-            if (cards.size >= input.toInt()) {
-                for (i in 0 until input.toInt()) {
-                    print("${cards[0]} ")
-                    cards.removeAt(0)
-                }
-                println()
-            } else {
-                println("The remaining cards are insufficient to meet the request.")
+    private fun getCards(cardCount: Int): MutableList<String> {
+        val cards = mutableListOf<String>()
+        if (cardCount <= cardDeck.size) {
+            for (i in 0 until cardCount) {
+                cards.add(cardDeck[0])
+                cardDeck.removeAt(0)
             }
+        } else {
+            println("The remaining cards are insufficient to meet the request.")
         }
+        return cards
     }
 }
 
