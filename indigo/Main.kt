@@ -1,165 +1,184 @@
 package indigo
 
+private val cardSuits = listOf("♣", "♦", "♥", "♠")
+private val cardRanks = listOf("K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2", "A")
+
+data class Card (val rank: String, val suit: String) {
+    override fun toString() = "$rank$suit"
+}
+
+class Deck {
+    private val cardDeck = mutableListOf<Card>()
+
+    fun initDeck() {
+        cardDeck.clear()
+        for (suit in cardSuits) {
+            for (rank in cardRanks) {
+                cardDeck.add(Card(rank, suit))
+            }
+        }
+    }
+
+    fun getCards(numberCards: Int = 6): MutableList<Card> {
+        val listCard = mutableListOf<Card>()
+        if (numberCards <= cardDeck.size) {
+            for (i in 0 until numberCards) {
+                listCard.add(cardDeck[0])
+                cardDeck.removeAt(0)
+            }
+        } else {
+            println("The remaining cards are insufficient to meet the request.")
+        }
+        return listCard
+    }
+
+    fun shuffleCards() = cardDeck.shuffle()
+}
+
+class Player() {
+    var handCards = mutableListOf<Card>()
+    var winCards = mutableListOf<Card>()
+    var score = 0
+}
+
+class Table {
+    var tableCards = mutableListOf<Card>()
+}
+
 class Indigo {
-    private val cardSuits = listOf("♣", "♦", "♥", "♠")
-    private val cardRanks = listOf("K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2", "A")
-    private val cardWithPointRanks = listOf('K', 'Q', 'J', '1', 'A')
-    private var cardDeck = mutableListOf<String>()
-    private var cardsTable = mutableListOf<String>()
-    private var cardsPlayer = mutableListOf<String>()
-    private var cardsComputer = mutableListOf<String>()
-    private var isPlayerTurn = false
+    private val cardsRanksWinPoint = listOf("K", "Q", "J", "10", "A")
+    private var isHumanTurn = false
+    private var isHumanLastWin = false
     private var cardsCount = 52
-    private var playerScore = 0
-    private var playerWinCards = 0
-    private var compScore = 0
-    private var compWinCards = 0
+    private val cardDeck = Deck()
+    private val table = Table()
+    private val human = Player()
+    private val computer = Player()
 
-    init {
+    private fun initialGame() {
         println("Indigo Card Game")
-        askForPlayFirst()
-        initialCard()
-        play()
-    }
-
-    private fun initialCard() {
-        resetCards()
-        cardDeck.shuffle()
-        print("Initial cards on the table: ")
-        cardsTable = getCards(4)
-        cardsCount -= 4
-        println(cardsTable.joinToString(" "))
-
-    }
-
-    private fun askForPlayFirst() {
         val correctAnswer = arrayOf("yes", "no")
         var answer: String
         do {
             println("Play first?")
             answer = readln()
         } while (answer !in correctAnswer)
-        isPlayerTurn = answer == "yes"
+        isHumanTurn = answer == "yes"
+        isHumanLastWin = isHumanTurn
     }
 
-    private fun play() {
+    private fun initialCard() {
+        cardDeck.initDeck()
+        cardDeck.shuffleCards()
+        print("Initial cards on the table: ")
+        table.tableCards = cardDeck.getCards(4)
+        cardsCount -= 4
+        println(table.tableCards.joinToString(" "))
+    }
+
+    fun play() {
+        initialGame()
+        initialCard()
         var playerActionInput = ""
         while (playerActionInput != "exit" && cardsCount >= 1) {
-            if (cardsComputer.size != 0 || cardsPlayer.size != 0) {
+            if (human.handCards.size != 0 || computer.handCards.size != 0) {
                 cardOnTableAndTop()
-                if (isPlayerTurn) playerActionInput = playerTurn() else computerTurn()
+                if (isHumanTurn) playerActionInput = playerTurn() else computerTurn()
                 cardsCount--
-                if (cardsTable.size > 1) {
+                if (table.tableCards.size > 1) {
                     checkTurn()
                 }
-                isPlayerTurn = !isPlayerTurn
+                isHumanTurn = !isHumanTurn
             } else {
-                cardsComputer = getCards()
-                cardsPlayer = getCards()
+                human.handCards = cardDeck.getCards(6)
+                computer.handCards = cardDeck.getCards(6)
             }
         }
-        if (cardsCount == 0) cardOnTableAndTop()
+        if (cardsCount == 0) {
+            cardOnTableAndTop()
+            if (human.winCards.size > computer.winCards.size)
+                human.score += 3
+            else
+                computer.score += 3
+            if (isHumanLastWin)
+                calculateScore(human)
+            else
+                calculateScore(computer)
+            printScore()
+        }
         println("Game Over")
     }
 
     private fun checkTurn() {
-        val currentCardRank =cardsTable[cardsTable.lastIndex].replace(("[^\\w\\d ]").toRegex(), "")
-        val previousCardRank = cardsTable[cardsTable.lastIndex - 1].replace(("[^\\w\\d ]").toRegex(), "")
-
-        val currentCardSuit = cardsTable[cardsTable.lastIndex][1]
-        val previousCardSuit = cardsTable[cardsTable.lastIndex - 1][1]
-
-        if (currentCardRank == previousCardRank || currentCardSuit == previousCardSuit) {
-            calculateScore()
-            printWinnerAndScore()
-            cardsTable.clear()
-            getCards()
-
+        val topCard = table.tableCards[table.tableCards.lastIndex]
+        val previousCard = table.tableCards[table.tableCards.lastIndex - 1]
+        if (topCard.rank == previousCard.rank || topCard.suit == previousCard.suit) {
+            isHumanLastWin = if (isHumanTurn) {
+                println("Player wins cards")
+                calculateScore(human)
+                true
+            } else {
+                println("Computer wins cards")
+                calculateScore(computer)
+                false
+            }
+            printScore()
+            table.tableCards.clear()
         }
     }
 
-    private fun calculateScore() {
-
-        if (isPlayerTurn) {
-            playerWinCards += cardsTable.size
-            playerScore += calculateCardsPoint()
-        } else {
-            compWinCards += cardsTable.size
-            compScore += calculateCardsPoint()
-        }
+    private fun calculateScore(player: Player) {
+        player.winCards += table.tableCards
+        player.score += calculateCardsPoint()
     }
 
     private fun calculateCardsPoint(): Int {
         var count = 0
-        for (i in 0 until cardsTable.size) {
-            if (cardsTable[i][0] in cardWithPointRanks) count++
+        for (i in 0 until table.tableCards.size) {
+            if (table.tableCards[i].rank in cardsRanksWinPoint) count++
         }
         return count
     }
 
-    private fun printWinnerAndScore() {
-        println(if (isPlayerTurn) "Player wins cards" else "Computer wins cards")
-        println("Score: Player $playerScore - Computer $compScore")
-        println("Cards: Player $playerWinCards - Computer $compWinCards")
+    private fun printScore() {
+        println("Score: Player ${human.score} - Computer ${computer.score}")
+        println("Cards: Player ${human.winCards.size} - Computer ${computer.winCards.size}")
     }
 
     private fun computerTurn() {
-        println("Computer plays ${cardsComputer[0]}")
-        cardsTable.add(cardsComputer[0])
-        cardsComputer.removeAt(0)
+        val computerPlay = computer.handCards[0]
+        println("Computer plays $computerPlay")
+        table.tableCards.add(computerPlay)
+        computer.handCards.remove(computerPlay)
     }
 
     private fun playerTurn(): String {
         print("Cards in hand:")
-        for (i in 0 until cardsPlayer.size) {
-            print(" ${i+1})${cardsPlayer[i]}")
+        for (i in 0 until human.handCards.size) {
+            print(" ${i+1})${human.handCards[i]}")
         }
-        println()
         var input: String
         do {
-            println("Choose a card to play (1-${cardsPlayer.size}):")
+            println("\nChoose a card to play (1-${human.handCards.size}):")
             input = readln()
             if (input.lowercase() == "exit") return "exit"
-            val isCorrect = input.matches(Regex("\\d+")) && input.toInt() in 1..cardsPlayer.size
+            val isCorrect = input.matches(Regex("\\d+")) && input.toInt() in 1..human.handCards.size
         } while (!isCorrect)
-        cardsTable.add(cardsPlayer[input.toInt() - 1])
-        cardsPlayer.removeAt(input.toInt() - 1)
+        table.tableCards.add(human.handCards[input.toInt() - 1])
+        human.handCards.removeAt(input.toInt() - 1)
         return input
     }
 
     private fun cardOnTableAndTop() {
-        if (cardsTable.size == 0) {
+        val size = table.tableCards.size
+        if (size == 0) {
             println("\nNo cards on the table")
         } else {
-            println("\n${cardsTable.size} cards on the table, and the top card is ${cardsTable[cardsTable.lastIndex]}")
+            println("\n${size} cards on the table, and the top card is ${table.tableCards[size - 1]}")
         }
-    }
-
-    private fun resetCards() {
-        var index = 0
-        cardDeck.clear()
-        for (suit in cardSuits) {
-            for (rank in cardRanks) {
-                cardDeck.add(index, "$rank$suit")
-                index++
-            }
-        }
-    }
-
-    private fun getCards(cardCount: Int = 6): MutableList<String> {
-        val cards = mutableListOf<String>()
-        if (cardCount <= cardDeck.size) {
-            for (i in 0 until cardCount) {
-                cards.add(cardDeck[0])
-                cardDeck.removeAt(0)
-            }
-        } else {
-            println("The remaining cards are insufficient to meet the request.")
-        }
-        return cards
     }
 }
 
 fun main() {
-    Indigo()
+    Indigo().play()
 }
