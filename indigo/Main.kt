@@ -3,11 +3,17 @@ package indigo
 class Indigo {
     private val cardSuits = listOf("♣", "♦", "♥", "♠")
     private val cardRanks = listOf("K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2", "A")
+    private val cardWithPointRanks = listOf('K', 'Q', 'J', '1', 'A')
     private var cardDeck = mutableListOf<String>()
-    private var cardsOnTable = mutableListOf<String>()
+    private var cardsTable = mutableListOf<String>()
     private var cardsPlayer = mutableListOf<String>()
     private var cardsComputer = mutableListOf<String>()
     private var isPlayerTurn = false
+    private var cardsCount = 52
+    private var playerScore = 0
+    private var playerWinCards = 0
+    private var compScore = 0
+    private var compWinCards = 0
 
     init {
         println("Indigo Card Game")
@@ -20,8 +26,9 @@ class Indigo {
         resetCards()
         cardDeck.shuffle()
         print("Initial cards on the table: ")
-        cardsOnTable = getCards(4)
-        println(cardsOnTable.joinToString(" "))
+        cardsTable = getCards(4)
+        cardsCount -= 4
+        println(cardsTable.joinToString(" "))
 
     }
 
@@ -37,24 +44,69 @@ class Indigo {
 
     private fun play() {
         var playerActionInput = ""
-        while (playerActionInput != "exit" && cardsOnTable.size < 52) {
+        while (playerActionInput != "exit" && cardsCount >= 1) {
             if (cardsComputer.size != 0 || cardsPlayer.size != 0) {
                 cardOnTableAndTop()
                 if (isPlayerTurn) playerActionInput = playerTurn() else computerTurn()
+                cardsCount--
+                if (cardsTable.size > 1) {
+                    checkTurn()
+                }
+                isPlayerTurn = !isPlayerTurn
             } else {
-                cardsComputer = getCards(6)
-                cardsPlayer = getCards(6)
+                cardsComputer = getCards()
+                cardsPlayer = getCards()
             }
         }
-        if (cardsOnTable.size == 52) cardOnTableAndTop()
+        if (cardsCount == 0) cardOnTableAndTop()
         println("Game Over")
+    }
+
+    private fun checkTurn() {
+        val currentCardRank =cardsTable[cardsTable.lastIndex].replace(("[^\\w\\d ]").toRegex(), "")
+        val previousCardRank = cardsTable[cardsTable.lastIndex - 1].replace(("[^\\w\\d ]").toRegex(), "")
+
+        val currentCardSuit = cardsTable[cardsTable.lastIndex][1]
+        val previousCardSuit = cardsTable[cardsTable.lastIndex - 1][1]
+
+        if (currentCardRank == previousCardRank || currentCardSuit == previousCardSuit) {
+            calculateScore()
+            printWinnerAndScore()
+            cardsTable.clear()
+            getCards()
+
+        }
+    }
+
+    private fun calculateScore() {
+
+        if (isPlayerTurn) {
+            playerWinCards += cardsTable.size
+            playerScore += calculateCardsPoint()
+        } else {
+            compWinCards += cardsTable.size
+            compScore += calculateCardsPoint()
+        }
+    }
+
+    private fun calculateCardsPoint(): Int {
+        var count = 0
+        for (i in 0 until cardsTable.size) {
+            if (cardsTable[i][0] in cardWithPointRanks) count++
+        }
+        return count
+    }
+
+    private fun printWinnerAndScore() {
+        println(if (isPlayerTurn) "Player wins cards" else "Computer wins cards")
+        println("Score: Player $playerScore - Computer $compScore")
+        println("Cards: Player $playerWinCards - Computer $compWinCards")
     }
 
     private fun computerTurn() {
         println("Computer plays ${cardsComputer[0]}")
-        cardsOnTable.add(cardsComputer[0])
+        cardsTable.add(cardsComputer[0])
         cardsComputer.removeAt(0)
-        isPlayerTurn = true
     }
 
     private fun playerTurn(): String {
@@ -70,14 +122,17 @@ class Indigo {
             if (input.lowercase() == "exit") return "exit"
             val isCorrect = input.matches(Regex("\\d+")) && input.toInt() in 1..cardsPlayer.size
         } while (!isCorrect)
-        cardsOnTable.add(cardsPlayer[input.toInt() - 1])
+        cardsTable.add(cardsPlayer[input.toInt() - 1])
         cardsPlayer.removeAt(input.toInt() - 1)
-        isPlayerTurn = false
         return input
     }
 
     private fun cardOnTableAndTop() {
-        println("\n${cardsOnTable.size} cards on the table, and the top card is ${cardsOnTable[cardsOnTable.lastIndex]}")
+        if (cardsTable.size == 0) {
+            println("\nNo cards on the table")
+        } else {
+            println("\n${cardsTable.size} cards on the table, and the top card is ${cardsTable[cardsTable.lastIndex]}")
+        }
     }
 
     private fun resetCards() {
@@ -91,7 +146,7 @@ class Indigo {
         }
     }
 
-    private fun getCards(cardCount: Int): MutableList<String> {
+    private fun getCards(cardCount: Int = 6): MutableList<String> {
         val cards = mutableListOf<String>()
         if (cardCount <= cardDeck.size) {
             for (i in 0 until cardCount) {
