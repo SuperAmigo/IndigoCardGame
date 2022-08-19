@@ -1,20 +1,21 @@
 package indigo
 
-private val cardSuits = listOf("♣", "♦", "♥", "♠")
-private val cardRanks = listOf("K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2", "A")
-
-data class Card (val rank: String, val suit: String) {
+data class Card (val rank: String, val suit: String, val point: Int) {
     override fun toString() = "$rank$suit"
 }
 
 class Deck {
+    private val cardSuits = listOf("♣", "♦", "♥", "♠")
+    private val cardRanks = listOf("K", "Q", "J", "10", "9", "8", "7", "6", "5", "4", "3", "2", "A")
+    private val cardRanksPoint = listOf("K", "Q", "J", "10", "A")
     private val cardDeck = mutableListOf<Card>()
 
     fun initDeck() {
         cardDeck.clear()
         for (suit in cardSuits) {
             for (rank in cardRanks) {
-                cardDeck.add(Card(rank, suit))
+                val point = if (rank in cardRanksPoint) 1 else 0
+                cardDeck.add(Card(rank, suit, point))
             }
         }
     }
@@ -35,7 +36,7 @@ class Deck {
     fun shuffleCards() = cardDeck.shuffle()
 }
 
-class Player() {
+class Player {
     var handCards = mutableListOf<Card>()
     var winCards = mutableListOf<Card>()
     var score = 0
@@ -46,7 +47,6 @@ class Table {
 }
 
 class Indigo {
-    private val cardsRanksWinPoint = listOf("K", "Q", "J", "10", "A")
     private var isHumanTurn = false
     private var isHumanLastWin = false
     private var cardsCount = 52
@@ -85,7 +85,7 @@ class Indigo {
                 cardOnTableAndTop()
                 if (isHumanTurn) playerActionInput = playerTurn() else computerTurn()
                 cardsCount--
-                if (table.tableCards.size > 1) {
+                if (table.tableCards.size > 1 && playerActionInput != "exit") {
                     checkTurn()
                 }
                 isHumanTurn = !isHumanTurn
@@ -135,7 +135,7 @@ class Indigo {
     private fun calculateCardsPoint(): Int {
         var count = 0
         for (i in 0 until table.tableCards.size) {
-            if (table.tableCards[i].rank in cardsRanksWinPoint) count++
+            count += table.tableCards[i].point
         }
         return count
     }
@@ -146,10 +146,67 @@ class Indigo {
     }
 
     private fun computerTurn() {
-        val computerPlay = computer.handCards[0]
+        val computerPlay: Card
+        val candidateList = mutableListOf<Card>()
+        val candidatePointList = mutableListOf<Card>()
+        println(computer.handCards.joinToString(" "))
+        if (table.tableCards.size > 0) {
+            val topTableCard = table.tableCards[table.tableCards.lastIndex]
+            for (compCard in computer.handCards) {
+                if (compCard.rank == topTableCard.rank || compCard.suit == topTableCard.suit)
+                    if (compCard.point == 1)
+                        candidatePointList.add(compCard)
+                    else
+                        candidateList.add(compCard)
+            }
+        }
+        computerPlay = if (candidatePointList.size > 0) {
+            candidatePointList.random()
+        } else if (candidateList.size > 0 ) {
+            candidateList.random()
+        } else {
+            getSameCard()
+        }
         println("Computer plays $computerPlay")
         table.tableCards.add(computerPlay)
         computer.handCards.remove(computerPlay)
+    }
+
+    private fun getSameCard(): Card {
+        val cardsWithSameSuit = getCardsWithSameSuit(computer.handCards)
+        if (cardsWithSameSuit.isNotEmpty())
+            return cardsWithSameSuit.sortedBy { it.rank }[0]
+        val cardsWithSameRank = getCardsWithSameRank(computer.handCards)
+        return if (cardsWithSameRank.isNotEmpty())
+            cardsWithSameRank.sortedBy { it.rank }[0]
+        else
+            computer.handCards.sortedBy { it.rank }[0]
+    }
+
+    private fun getCardsWithSameSuit(deck: MutableList<Card>): List<Card> {
+        val properties = mutableMapOf<String, Int>()
+        for (item in deck) {
+            val property = item.suit
+            if (properties.contains(property)) {
+                properties[property] = properties[property]!! + 1
+            } else {
+                properties[property] = 1
+            }
+        }
+        return deck.filter { properties[it.suit]!! > 1 }
+    }
+
+    private fun getCardsWithSameRank(deck: MutableList<Card>): List<Card> {
+        val properties = mutableMapOf<String, Int>()
+        for (item in deck) {
+            val property = item.rank
+            if (properties.contains(property)) {
+                properties[property] = properties[property]!! + 1
+            } else {
+                properties[property] = 1
+            }
+        }
+        return deck.filter { properties[it.rank]!! > 1 }
     }
 
     private fun playerTurn(): String {
